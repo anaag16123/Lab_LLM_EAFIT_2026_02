@@ -74,7 +74,7 @@ with tab1:
         
         if uploaded_file:
             image = Image.open(uploaded_file)
-            st.image(image, caption="Imagen Cargada", use_column_width=True)
+            st.image(image, caption="Imagen Cargada", use_container_width=True)
             
     with col_opt:
         st.subheader("2. Configuración de la Respuesta")
