@@ -3,3 +3,6 @@ groq
 scikit-learn
 numpy
 pandas
+pillow
+textstat
+nltk
