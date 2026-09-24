@@ -15,7 +15,7 @@ st.set_page_config(
 
 st.title("🔍 OCR + Amplificación LLM & Métricas Textuales")
 st.markdown(
-    "Esta plataforma recibe una imagen, extrae o procesa el contenido, "
+    "Esta plataforma recibe una imagen, extrae o procesa el contenido textual, "
     "amplía la respuesta utilizando un LLM ajustando su tono (Formal o Técnico) "
     "y evalúa métricas del texto generado (Coherencia, Sintaxis, Gramática y Medidas)."
 )
@@ -24,8 +24,9 @@ st.markdown(
 # Sidebar: Configuración de la API Key y Parámetros del LLM
 # ---------------------------------------------------------
 st.sidebar.header("🔑 Configuración de la API Key")
-api_key = st.sidebar.text_input("Ingresa tu API Key de Groq / OpenAI:", type="password")
+api_key = st.sidebar.text_input("Ingresa tu API Key de Groq:", type="password")
 
+# Nombres de modelos actualizados y soportados oficialmente por Groq
 model_option = st.sidebar.selectbox(
     "Selecciona el Modelo LLM:",
     [
@@ -40,7 +41,7 @@ st.sidebar.header("🎛️ Parámetros del Modelo")
 temperature = st.sidebar.slider("Temperatura (Creatividad):", min_value=0.0, max_value=2.0, value=0.5, step=0.1)
 max_tokens = st.sidebar.slider("Máximo de Tokens:", min_value=100, max_value=4096, value=512, step=50)
 
-# Inicializar cliente
+# Inicializar cliente de Groq
 client = None
 if api_key:
     try:
@@ -56,7 +57,7 @@ else:
 # ---------------------------------------------------------
 tab1, tab2 = st.tabs(["📷 Carga de Imagen & Generación LLM", "📊 Métricas del Texto Generado"])
 
-# Variable de estado para compartir el texto entre pestañas
+# Variables de estado para compartir la información entre pestañas
 if "generated_response" not in st.session_state:
     st.session_state.generated_response = ""
 if "extracted_text" not in st.session_state:
@@ -74,6 +75,7 @@ with tab1:
         
         if uploaded_file:
             image = Image.open(uploaded_file)
+            # Solución al deprecado use_column_width
             st.image(image, caption="Imagen Cargada", use_container_width=True)
             
     with col_opt:
@@ -93,10 +95,10 @@ with tab1:
     st.markdown("---")
     st.subheader("3. Extracción de Texto (OCR) y Procesamiento")
     
-    # Campo para texto extraído (Simulación / Tesseract / OCR Entrada)
     extracted_input = st.text_area(
-        "Texto extraído de la imagen (puedes editarlo o ingresarlo si el OCR automático no está activo):",
-        value=st.session_state.extracted_text if st.session_state.extracted_text else "Ingresa o verifica el texto de la imagen aquí...",
+        "Texto extraído de la imagen (ingresa o verifica el texto extraído mediante OCR):",
+        value=st.session_state.extracted_text if st.session_state.extracted_text else "",
+        placeholder="Escribe o pega aquí el texto de la imagen...",
         height=120
     )
     st.session_state.extracted_text = extracted_input
@@ -105,15 +107,14 @@ with tab1:
         if not client:
             st.error("Debes ingresar tu API Key en la barra lateral antes de continuar.")
         elif not extracted_input.strip():
-            st.error("El texto extraído está vacío.")
+            st.error("El cuadro de texto extraído está vacío. Por favor escribe o confirma el texto a procesar.")
         else:
-            # Construcción del prompt según el estilo seleccionado
-            system_prompt = f"Eres un asistente experto en análisis textual. Tu tarea es responder con un tono **{tone.upper()}**."
+            system_prompt = f"Eres un asistente experto en análisis textual. Tu tarea es responder estrictamente con un tono **{tone.upper()}**."
             user_prompt = (
-                f"A continuación se presenta el texto extraído mediante OCR de una imagen:\n\n"
+                f"A continuación se presenta el texto extraído de una imagen:\n\n"
                 f"\"\"\"\n{extracted_input}\n\"\"\"\n\n"
                 f"Instrucción: {prompt_instruction}\n\n"
-                f"Por favor, proporciona una respuesta amplia, coherente y bien estructurada en tono {tone}."
+                f"Por favor, proporciona una respuesta ampliada, coherente y estructurada en tono {tone}."
             )
             
             try:
@@ -152,7 +153,7 @@ with tab2:
         st.caption(text_to_analyze[:300] + ("..." if len(text_to_analyze) > 300 else ""))
         st.markdown("---")
         
-        # 1. Medidas Cuantitativas Básicas
+        # 1. Medidas Cuantitativas Básicas del Texto
         words = re.findall(r'\b\w+\b', text_to_analyze)
         sentences = [s for s in re.split(r'[\.\!\?]+', text_to_analyze) if s.strip()]
         num_words = len(words)
@@ -171,53 +172,51 @@ with tab2:
         # 2. Métricas de Complejidad, Sintaxis y Legibilidad
         st.subheader("📐 Sintaxis, Legibilidad y Complejidad")
         
-        # Cálculo de métricas
         flesch_score = textstat.flesch_reading_ease(text_to_analyze)
         fog_index = textstat.gunning_fog(text_to_analyze)
-        ttr = (vocab_unique / num_words) if num_words > 0 else 0  # Type-Token Ratio (Diversidad Léxica)
+        ttr = (vocab_unique / num_words) if num_words > 0 else 0
         avg_words_per_sentence = num_words / num_sentences if num_sentences > 0 else 0
 
         c1, c2, c3 = st.columns(3)
         
         with c1:
-            st.metric("Índice de Legibilidad (Flesch)", f"{flesch_score:.2f}")
+            st.metric("Legibilidad (Flesch Score)", f"{flesch_score:.2f}")
             st.caption("Valores más altos indican un texto más fácil de leer.")
             
         with c2:
             st.metric("Gunning Fog Index", f"{fog_index:.2f}")
-            st.caption("Años de educación formal necesarios para entender el texto.")
+            st.caption("Grado educativo requerido para su comprensión.")
             
         with c3:
             st.metric("Diversidad Léxica (TTR)", f"{ttr:.2f}")
-            st.caption("Relación entre vocabulario único y total de palabras (Coherencia/Riqueza).")
+            st.caption("Proporción entre vocabulario único y total de palabras.")
             
-        # 3. Métricas de Coherencia y Gramática
-        st.subheader("🧠 Evaluación Cualitativa Estimada (Coherencia & Gramática)")
+        # 3. Métricas de Coherencia, Gramática y Estructura
+        st.subheader("🧠 Evaluación Cualitativa Estimada")
         
-        # Estimación heurística de métricas
         grammar_score = min(100, max(60, int(100 - (fog_index * 2))))
         coherence_score = min(100, max(50, int(ttr * 100 + (flesch_score * 0.3))))
         syntax_score = min(100, max(50, int(100 - abs(avg_words_per_sentence - 15) * 2)))
 
         df_metrics = pd.DataFrame({
-            "Dimensión Evaludada": [
+            "Dimensión Evaluada": [
                 "Gramática & Corrección Estructural",
                 "Coherencia Semántica Estimada",
                 "Complejidad Sintáctica",
                 "Longitud Promedio por Oración"
             ],
-            "Valor / Puntuación": [
+            "Puntuación": [
                 f"{grammar_score} / 100",
                 f"{coherence_score} / 100",
                 f"{syntax_score} / 100",
                 f"{avg_words_per_sentence:.1f} palabras"
             ],
             "Diagnóstico": [
-                "Estructura gramatical limpia y adecuada.",
-                "Riqueza de vocabulario y fluidez general.",
-                "Estructura de oraciones balanceada.",
-                "Longitud adecuada para comprensión."
+                "Estructura sintáctica estándar y comprensible.",
+                "Fluidez léxica y consistencia contextual.",
+                "Estructura oracional bien balanceada.",
+                "Distribución adecuada de ideas por frase."
             ]
         })
         
-        st.table(df_metrics)
+        st.dataframe(df_metrics, use_container_width=True)
